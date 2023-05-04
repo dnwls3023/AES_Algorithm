@@ -151,6 +151,12 @@ void MixColumns() {
 }
 
 void InitExpandKey() {
+	// reset
+	pt_s_str.clear();
+	ck_s_str.clear();
+	v_ptHex16.clear();
+	k_ckHex16.clear();
+
 	for (int i = 0; i < 16; ++i) {
 		pt_s_str.push_back(plainTxt.substr(i * 2, 2));
 		ck_s_str.push_back(cipherKey.substr(i * 2, 2));
@@ -212,7 +218,37 @@ void AES_Encryption(string str) {
 	ShiftRows();
 	AddRoundKey(10);
 }
-
+void AES_Encryption_Debug(string str) {
+	// INIT
+	Init__S_boxMappingTable();
+	CreateState(str);
+	cout << "CreateState" << endl;
+	UtilCipherText(true);
+	InitExpandKey();
+	ExpandKey();
+	AddRoundKey(0);
+	cout << "AddRoundKey 0" << endl;
+	UtilCipherText(true);
+	for (int i = 1; i < 10; ++i) {
+		cout << "Round" << i << endl;
+		SubBytes();
+		cout << "SubBytes" << endl;
+		UtilCipherText(true);
+		ShiftRows();
+		cout << "ShiftRows" << endl;
+		UtilCipherText(true);
+		MixColumns();
+		cout << "MixColumns" << endl;
+		UtilCipherText(true);
+		AddRoundKey(i);
+		cout << "AddRoundKey " << i << endl;
+		UtilCipherText(true);
+		cout << endl;
+	}
+	SubBytes();
+	ShiftRows();
+	AddRoundKey(10);
+}
 void ECB_Mode(bool isPrint) {
 	string tempTxt = plainTxt;
 	int size = plainTxt.size();
@@ -230,8 +266,11 @@ void ECB_Mode(bool isPrint) {
 				plainTxt.append(PKCS7);
 			}
 		}
-		AES_Encryption(plainTxt);
-		ecb_output_str.push_back( Push_back_Str() );
+		if(isPrint)
+			AES_Encryption_Debug(plainTxt);
+		else
+			AES_Encryption(plainTxt);
+		ecb_output_str.push_back(Push_back_Str());
 	}
 
 	if (isPrint) {
@@ -332,15 +371,20 @@ string UtilCipherText(bool isPrint) {
 
 	for (int i = 0; i < 4; ++i) {
 		for (int j = 0; j < 4; ++j) {
-			oss << hex << uppercase << setw(2)<< setfill('0') << M44[j][i];
+			oss << hex << uppercase << setw(2) << setfill('0') << M44[j][i];
+			if (isPrint)
+				printf("%02X ", M44[i][j]);
 		}
+		if (isPrint)
+			cout << endl;
 	}
-
+	/*
 	if(isPrint)
 		cout << oss.str() << endl;
-
+	*/
 	return oss.str();
 }
+
 
 // 16바이트 16진수 데이터의 string을 4by4 matrix로 변환시키는 연산. 첫번째 인수는 call-by-address 방식을 사용
 void Hex16BStringTo4by4Mat(int arr[][4],string value) {
@@ -419,17 +463,17 @@ void CTR_MODE(bool isPrint) {
 
 int main(void) {
 	srand(time(NULL));
-	
-	cout << plainTxt << endl;
-	cout << cipherKey << endl;
+	/*
 	plainTxt = "123456789012345678901234567890122234567890123456789012345678901232345678901234567890123456789012";
 	cipherKey = "12345678901234567890123456789012";
 	CBC_MODE(true);
 	plainTxt = "123456789012345678901234567890122234567890123456789012345678901232345678901234567890123456789012";
 	cipherKey = "12345678901234567890123456789012";
 	CTR_MODE(true);
-	plainTxt = "123456789012345678901234567890122234567890123456789012345678901232345678901234567890123456789012";
-	cipherKey = "12345678901234567890123456789012";
+	*/
+	plainTxt = "4C6D73646F20756F72696D6C6570206F";
+	cipherKey = "2B28AB097EAEF7CF15D2154F16A6883C";
+
 	ECB_Mode(true);
 	return 0;
 }
