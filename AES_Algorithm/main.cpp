@@ -246,8 +246,14 @@ void AES_Encryption_Debug(string str) {
 		cout << endl;
 	}
 	SubBytes();
+	cout << "SubBytes" << endl;
+	UtilCipherText(true);
 	ShiftRows();
+	cout << "ShiftRows" << endl;
+	UtilCipherText(true);
 	AddRoundKey(10);
+	cout << "AddRoundKey 10" << endl;
+	UtilCipherText(true);
 }
 void ECB_Mode(bool isPrint) {
 	string tempTxt = plainTxt;
