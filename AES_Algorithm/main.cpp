@@ -1,4 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS // sprintf
+#define multiply(a) (((a) << 1) ^ (((a >> 7) & 1) * 0x1b) % 0xFF) // MixColumns 연산
 
 #include <iostream>
 #include <string>
@@ -122,6 +123,13 @@ int FixedMatrix44[4][4] = {
 	{3,1,1,2}
 };
 
+int InvFixedMatrix44[4][4] = {
+	{0x0E,0x0B,0x0D,0x09},
+	{0x09,0x0E,0x0B,0x0D},
+	{0x0D,0x09,0x0E,0x0B},
+	{0x0B,0x0D,0x09,0x0E},
+};
+
 void MixColumns() {
 	int TM44[4][4] = {}; // 0으로 초기화된 임시행렬
 	// 4by4 행렬 곱
@@ -132,7 +140,7 @@ void MixColumns() {
 					TM44[j][i] ^= M44[k][i];
 				}
 				else {
-					TM44[j][i] ^= (((M44[k][i] << 1) ^ (((M44[k][i] >> 7) & 1) * 0x1b)));
+					TM44[j][i] ^= multiply(M44[k][i]);
 					if (FixedMatrix44[j][k] == 3) {
 						TM44[j][i] ^= M44[k][i];
 					}
@@ -140,14 +148,14 @@ void MixColumns() {
 			}
 		}
 	}
-	
+	/*
 	// 값이 8비트를 넘어갈경우 잘라내기
 	for (int i = 0; i < 4; ++i) {
 		for (int j = 0; j < 4; ++j) {
 			M44[i][j] = TM44[i][j] % 256;
 		}
 	}
-	
+	*/
 }
 
 void InitExpandKey() {
@@ -218,6 +226,128 @@ void AES_Encryption(string str) {
 	ShiftRows();
 	AddRoundKey(10);
 }
+
+// 오른쪽 shift 연산
+void InvShiftRows() {
+	// i = 0일 때 그대로 두므로 Skip
+	int TM44[4][4]; // 임시 4by4 Matrix
+	for (int i = 1; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			// 1 2 3 0 <- 0 1 2 3 ..... 3 0 1 2 <- 0 1 2 3
+			TM44[i][(j + i) % 4] = M44[i][j];
+		}
+	}
+
+	for (int i = 1; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			M44[i][j] = TM44[i][j];
+		}
+	}
+}
+
+// Find Inv S-Box
+int InvS_Box(int x, int y) {
+	// stl map에 대한 역연산 (완전탐색)
+	for (int i = 0; i < 16; ++i) {
+		for (int j = 0; j < 16; ++j) {
+			if (S_Box[i * 16 + j] == M44[x][y])
+				return i * 16 + j;
+		}
+	}
+	// 탐색 실패
+	return -1;
+}
+
+// Inverse S-Box 사용
+void InvSubBytes() {
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			M44[i][j] = InvS_Box(i,j);
+		}
+	}
+}
+
+void InvMixColumns() {
+	int TM44[4][4] = {}; // 0으로 초기화된 임시행렬
+	// 4by4 행렬 곱
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			for (int k = 0; k < 4; ++k) {
+				TM44[j][i] ^= multiply(multiply(multiply(M44[k][i])));
+				if (InvFixedMatrix44[j][k] == 9 || InvFixedMatrix44[j][k] == 11 || InvFixedMatrix44[j][k] == 13) {
+					TM44[j][i] ^= M44[k][i];
+				}
+				else if (InvFixedMatrix44[j][k] == 11 || InvFixedMatrix44[j][k] == 14) {
+					TM44[j][i] ^= multiply(M44[k][i]);
+				}
+				else if (InvFixedMatrix44[j][k] == 13 || InvFixedMatrix44[j][k] == 14) {
+					TM44[j][i] ^= multiply(multiply(M44[k][i]));
+				}
+			}
+		}
+	}
+	/*
+	// 값이 8비트를 넘어갈경우 잘라내기
+	for (int i = 0; i < 4; ++i) {
+		for (int j = 0; j < 4; ++j) {
+			M44[i][j] = TM44[i][j] % 256;
+		}
+	}
+	*/
+}
+
+void AES_Decryption(string str) {
+	// INIT
+	Init__S_boxMappingTable();
+
+	CreateState(str);
+	InitExpandKey();
+	ExpandKey();
+	AddRoundKey(10);
+	for (int i = 1; i < 10; ++i) {
+		InvShiftRows();
+		InvSubBytes();
+		AddRoundKey(10 - i);
+		InvMixColumns();
+	}
+	InvShiftRows();
+	InvSubBytes();
+	AddRoundKey(0);
+}
+
+void AES_Decryption_Debug(string str) {
+	// INIT
+	Init__S_boxMappingTable();
+
+	CreateState(str);
+	cout << "CreateState" << endl;
+	UtilCipherText(true);
+	InitExpandKey();
+	ExpandKey();
+	AddRoundKey(10);
+	cout << "AddRoundKey 10" << endl;
+	UtilCipherText(true);
+	for (int i = 1; i < 10; ++i) {
+		cout << "Round" << i << endl;
+		InvShiftRows();
+		cout << "InvShiftRows" << endl;
+		UtilCipherText(true);
+		InvSubBytes();
+		cout << "InvSubBytes" << endl;
+		UtilCipherText(true);
+		AddRoundKey(10-i);
+		cout << "AddRoundKey " << 10-i << endl;
+		UtilCipherText(true);
+		InvMixColumns();
+		cout << "MixColumns" << endl;
+		UtilCipherText(true);
+		cout << endl;
+	}
+	InvShiftRows();
+	InvSubBytes();
+	AddRoundKey(0);
+}
+
 void AES_Encryption_Debug(string str) {
 	// INIT
 	Init__S_boxMappingTable();
@@ -467,6 +597,13 @@ void CTR_MODE(bool isPrint) {
 	}
 }
 
+/// <summary>
+/// AES Algorithm 1.1 (2023/05/15 +Decryption, Interface, Comment)
+/// 프로그램 사용시 주의사항
+/// AES_Encryption 함수와 AES_Decryption 함수 사용 후 plainTxt와 cipherKey 변수를 초기화 하는 것을 권장함
+/// </summary>
+/// <param name=""></param>
+/// <returns></returns>
 int main(void) {
 	srand(time(NULL));
 	/*
@@ -477,9 +614,26 @@ int main(void) {
 	cipherKey = "12345678901234567890123456789012";
 	CTR_MODE(true);
 	*/
+	
+	// 평문과 암호키를 초기화
 	plainTxt = "4C6D73646F20756F72696D6C6570206F";
 	cipherKey = "2B28AB097EAEF7CF15D2154F16A6883C";
+	// PlainText와 CipherKey 출력
+	cout << "plainText : " << plainTxt << endl;
+	cout << "cipherKey : " << cipherKey << endl;
 
-	ECB_Mode(true);
+	// AES 알고리즘 돌리기
+	AES_Encryption(plainTxt);
+	plainTxt = UtilCipherText(false);
+
+	// AES 알고리즘을 돌리고 난 암호문 출력
+	cout << "CipherText : " << UtilCipherText(false) << endl;
+
+	// 암호문을 복호화 하기
+	AES_Decryption(plainTxt);
+
+	// 다시 평문을 출력
+	cout << "PlainText : " << UtilCipherText(false) << endl;
+	// ECB_Mode(true);
 	return 0;
 }
