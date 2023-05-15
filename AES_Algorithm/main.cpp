@@ -1,5 +1,5 @@
 #define _CRT_SECURE_NO_WARNINGS // sprintf
-#define multiply(a) (((a) << 1) ^ (((a >> 7) & 1) * 0x1b) % 0xFF) // MixColumns 연산
+#define multiply(a) (((a) << 1) ^ (((a >> 7) & 1) * 0x1b) % 0x100) // MixColumns 연산
 
 #include <iostream>
 #include <string>
@@ -137,25 +137,25 @@ void MixColumns() {
 		for (int j = 0; j < 4; ++j) {
 			for (int k = 0; k < 4; ++k) {
 				if (FixedMatrix44[j][k] == 1) {
-					TM44[j][i] ^= M44[k][i];
+					TM44[j][i] ^= M44[k][i] % 0x100;
 				}
 				else {
 					TM44[j][i] ^= multiply(M44[k][i]);
 					if (FixedMatrix44[j][k] == 3) {
-						TM44[j][i] ^= M44[k][i];
+						TM44[j][i] ^= M44[k][i] % 0x100;
 					}
 				}
 			}
 		}
 	}
-	/*
+	
 	// 값이 8비트를 넘어갈경우 잘라내기
 	for (int i = 0; i < 4; ++i) {
 		for (int j = 0; j < 4; ++j) {
-			M44[i][j] = TM44[i][j] % 256;
+			M44[i][j] = TM44[i][j] % 0x100;
 		}
 	}
-	*/
+	
 }
 
 void InitExpandKey() {
@@ -174,13 +174,14 @@ void InitExpandKey() {
 		v_ptHex16.push_back(stoi(pt_s_str[i], nullptr, 16));
 		k_ckHex16.push_back(stoi(ck_s_str[i], nullptr, 16));
 	}
-
+	
 	// 행과 열을 교환
 	for (int i = 0; i < 4; ++i) {
 		for (int j = 0; j < 4; ++j) {
 			Key[j][i] = k_ckHex16[i * 4 + j];
 		}
 	}
+	
 }
 
 void ExpandKey() {
@@ -267,6 +268,21 @@ void InvSubBytes() {
 	}
 }
 
+unsigned char gmul(unsigned char a, unsigned char b) {
+	unsigned char p = 0;
+	unsigned char hi_bit_set;
+	for (int counter = 0; counter < 8; counter++) {
+		if ((b & 1) == 1)
+			p ^= a;
+		hi_bit_set = (unsigned char)(a & 0x80);
+		a <<= 1;
+		if (hi_bit_set == 0x80)
+			a ^= 0x1b; // 0x1b는 GF(2^8)에서 사용되는 고정 다항식
+		b >>= 1;
+	}
+	return p;
+}
+
 void InvMixColumns() {
 	int TM44[4][4] = {}; // 0으로 초기화된 임시행렬
 	// 4by4 행렬 곱
@@ -277,23 +293,23 @@ void InvMixColumns() {
 				if (InvFixedMatrix44[j][k] == 9 || InvFixedMatrix44[j][k] == 11 || InvFixedMatrix44[j][k] == 13) {
 					TM44[j][i] ^= M44[k][i];
 				}
-				else if (InvFixedMatrix44[j][k] == 11 || InvFixedMatrix44[j][k] == 14) {
+				if (InvFixedMatrix44[j][k] == 11 || InvFixedMatrix44[j][k] == 14) {
 					TM44[j][i] ^= multiply(M44[k][i]);
 				}
-				else if (InvFixedMatrix44[j][k] == 13 || InvFixedMatrix44[j][k] == 14) {
+				if (InvFixedMatrix44[j][k] == 13 || InvFixedMatrix44[j][k] == 14) {
 					TM44[j][i] ^= multiply(multiply(M44[k][i]));
 				}
 			}
 		}
 	}
-	/*
+	
 	// 값이 8비트를 넘어갈경우 잘라내기
 	for (int i = 0; i < 4; ++i) {
 		for (int j = 0; j < 4; ++j) {
 			M44[i][j] = TM44[i][j] % 256;
 		}
 	}
-	*/
+	
 }
 
 void AES_Decryption(string str) {
@@ -624,16 +640,16 @@ int main(void) {
 
 	// AES 알고리즘 돌리기
 	AES_Encryption(plainTxt);
-	plainTxt = UtilCipherText(false);
-
+	cout << "암호화 완료! " << endl;
 	// AES 알고리즘을 돌리고 난 암호문 출력
 	cout << "CipherText : " << UtilCipherText(false) << endl;
-
+	
 	// 암호문을 복호화 하기
+	plainTxt = UtilCipherText(false);
 	AES_Decryption(plainTxt);
-
+	cout << "복호화 완료!" << endl;
 	// 다시 평문을 출력
 	cout << "PlainText : " << UtilCipherText(false) << endl;
-	// ECB_Mode(true);
+	
 	return 0;
 }
