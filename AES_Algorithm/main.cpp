@@ -268,21 +268,6 @@ void InvSubBytes() {
 	}
 }
 
-unsigned char gmul(unsigned char a, unsigned char b) {
-	unsigned char p = 0;
-	unsigned char hi_bit_set;
-	for (int counter = 0; counter < 8; counter++) {
-		if ((b & 1) == 1)
-			p ^= a;
-		hi_bit_set = (unsigned char)(a & 0x80);
-		a <<= 1;
-		if (hi_bit_set == 0x80)
-			a ^= 0x1b; // 0x1b는 GF(2^8)에서 사용되는 고정 다항식
-		b >>= 1;
-	}
-	return p;
-}
-
 void InvMixColumns() {
 	int TM44[4][4] = {}; // 0으로 초기화된 임시행렬
 	// 4by4 행렬 곱
